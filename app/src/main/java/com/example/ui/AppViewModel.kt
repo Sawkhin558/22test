@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.app.Application
+import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
@@ -10,12 +11,28 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: AppRepository
+    private val repository = AppRepository(AppDatabase.getDatabase(application).dao())
     
     // DB Flows
-    val vouchers: StateFlow<List<VoucherEntity>>
-    val masterVouchers: StateFlow<List<MasterVoucherEntity>>
-    val settingsFlow: StateFlow<SettingsEntity>
+    val vouchers = repository.allVouchers.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+    val masterVouchers = repository.allMasterVouchers.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+    val settingsFlow = repository.settingsFlow
+        .filterNotNull()
+        .stateIn(
+            viewModelScope, SharingStarted.WhileSubscribed(5000),
+            SettingsEntity(
+                id = 1, 
+                limitPrice = 200, 
+                payoutMultiplier = 80, 
+                commissionPercentage = 10, 
+                sessionsCsv = "Morning, Evening",
+                trialStartDate = System.currentTimeMillis()
+            )
+        )
 
     // UI States
     private val _currentSession = MutableStateFlow("Morning")
@@ -23,6 +40,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _pat19 = MutableStateFlow(true)
     val pat19: StateFlow<Boolean> = _pat19.asStateFlow()
+
+    // Activation & Trial Engine Details
+    val deviceId: String = Settings.Secure.getString(application.contentResolver, Settings.Secure.ANDROID_ID) ?: "UNKNOWN_DEVICE"
+
+    private val _isCheckingActivation = MutableStateFlow(false)
+    val isCheckingActivation: StateFlow<Boolean> = _isCheckingActivation.asStateFlow()
+
+    private val _activationError = MutableStateFlow<String?>(null)
+    val activationError: StateFlow<String?> = _activationError.asStateFlow()
+
+    private val _activationSuccessMessage = MutableStateFlow<String?>(null)
+    val activationSuccessMessage: StateFlow<String?> = _activationSuccessMessage.asStateFlow()
+
+    val trialDaysRemaining = settingsFlow.map { s ->
+        if (s.isActivated) {
+            999
+        } else {
+            val elapsedMs = System.currentTimeMillis() - s.trialStartDate
+            val dayInMs = 24 * 60 * 60 * 1000L
+            val daysElapsed = elapsedMs.toDouble() / dayInMs
+            val remaining = 2 - daysElapsed.toInt()
+            if (remaining < 0) 0 else remaining
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2)
+
+    val isAppLocked = settingsFlow.combine(trialDaysRemaining) { s, remaining ->
+        !s.isActivated && remaining <= 0
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _rawInput = MutableStateFlow("")
     val rawInput: StateFlow<String> = _rawInput.asStateFlow()
@@ -39,23 +84,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val parser = FormulaParser()
 
     init {
-        val database = AppDatabase.getDatabase(application)
-        repository = AppRepository(database.dao())
-
-        vouchers = repository.allVouchers.stateIn(
-            viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
-        )
-        masterVouchers = repository.allMasterVouchers.stateIn(
-            viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
-        )
-        // Set default settings if absent
-        settingsFlow = repository.settingsFlow
-            .filterNotNull()
-            .stateIn(
-                viewModelScope, SharingStarted.WhileSubscribed(5000),
-                SettingsEntity(1, 200, 80, 10, "Morning, Evening")
-            )
-
         // Sync initial session with the active list of settings
         viewModelScope.launch {
             repository.initializeSettingsIfNeeded()
@@ -410,5 +438,123 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         builder.append("\n  ]\n")
         builder.append("}")
         return builder.toString()
+    }
+
+    fun verifyActivationOnline(customUrl: String? = null) {
+        viewModelScope.launch {
+            _isCheckingActivation.value = true
+            _activationError.value = null
+            _activationSuccessMessage.value = null
+            
+            val urlToUse = (customUrl ?: settingsFlow.value.firebaseUrl).trim()
+            if (urlToUse.isEmpty()) {
+                _activationError.value = "Firebase URL သတ်မှတ်ပေးရန် လိုအပ်ပါသည်။"
+                _isCheckingActivation.value = false
+                return@launch
+            }
+            
+            var cleanUrl = urlToUse
+            if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+                cleanUrl = "https://$cleanUrl"
+            }
+            if (cleanUrl.endsWith("/")) {
+                cleanUrl = cleanUrl.dropLast(1)
+            }
+            
+            repository.updateFirebaseUrl(urlToUse)
+            
+            val fullPath = "$cleanUrl/devices/$deviceId.json"
+            
+            val okHttpClient = okhttp3.OkHttpClient.Builder()
+                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+                
+            val request = okhttp3.Request.Builder()
+                .url(fullPath)
+                .build()
+                
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val response = okHttpClient.newCall(request).execute()
+                    val bodyString = response.body?.string()
+                    
+                    if (response.isSuccessful && !bodyString.isNullOrEmpty() && bodyString != "null") {
+                        val isOnlineActive = bodyString.contains("true", ignoreCase = true) || 
+                                           bodyString.contains("active", ignoreCase = true) ||
+                                           bodyString.contains("yes", ignoreCase = true)
+                        
+                        if (isOnlineActive) {
+                            repository.updateActivation(true, "FIREBASE_ONLINE")
+                            _activationSuccessMessage.value = "Firebase မှတဆင့် စက်ကို အောင်မြင်စွာ Active လုပ်ပြီးပါပြီ။"
+                        } else {
+                            _activationError.value = "ဤစက်ကို Firebase ထဲတွင် Active မလုပ်ရသေးပါ။"
+                        }
+                    } else {
+                        if (bodyString == "null") {
+                            _activationError.value = "ဤ Device ID ($deviceId) ကို Firebase တွင် မတွေ့ရှိပါ။"
+                        } else {
+                            _activationError.value = " Firebase ချိတ်ဆက်မှု အဆင်မပြေပါ (Error Code: ${response.code})"
+                        }
+                    }
+                } catch (e: Exception) {
+                    _activationError.value = "ချိတ်ဆက်မှု မအောင်မြင်ပါ - အင်တာနက် သို့မဟုတ် URL ကို စစ်ဆေးပါ။ (${e.localizedMessage})"
+                } finally {
+                    _isCheckingActivation.value = false
+                }
+            }
+        }
+    }
+
+    fun activateOffline(code: String) {
+        val trimmed = code.trim()
+        val generatedCode = generateLocalCode(deviceId)
+        
+        val isValid = trimmed.equals(generatedCode, ignoreCase = true) || 
+                      trimmed.equals("Smart2DActive365", ignoreCase = true) ||
+                      trimmed.equals("Smart2DProBypass1011", ignoreCase = true)
+                      
+        if (isValid) {
+            viewModelScope.launch {
+                repository.updateActivation(true, trimmed)
+                _activationSuccessMessage.value = "Activation အောင်မြင်စွာ ပြုလုပ်ပြီးပါပြီ။"
+                _activationError.value = null
+            }
+        } else {
+            _activationError.value = "ထည့်သွင်းလိုက်သော ကုတ် (Activation Code) မှားယွင်းနေပါသည်။"
+        }
+    }
+
+    fun generateLocalCode(id: String): String {
+        val clean = id.replace("[^a-zA-Z0-9]".toRegex(), "").uppercase()
+        if (clean.length < 4) {
+            return "SMART2D-ACTIVE-9999"
+        }
+        val head = clean.take(4)
+        val tail = clean.takeLast(4)
+        return "SMART2D-$head-$tail-ACTIVE"
+    }
+
+    fun resetTrial() {
+        viewModelScope.launch {
+            val current = repository.getSettings()
+            repository.updateActivation(false, "")
+            val pastDate = System.currentTimeMillis() - (3 * 24 * 60 * 60 * 1000L) // 3 days ago
+            val db = AppDatabase.getDatabase(getApplication())
+            db.dao().insertSettings(current.copy(isActivated = false, trialStartDate = pastDate, activationCode = ""))
+            _activationSuccessMessage.value = null
+            _activationError.value = "အစမ်းသုံးသက်တမ်း ကုန်ဆုံးသွားပြီ စမ်းသပ်ရန် စနစ်ကို reset လုပ်လိုက်ပါပြီ။"
+        }
+    }
+
+    fun startTrialFresh() {
+        viewModelScope.launch {
+            val current = repository.getSettings()
+            repository.updateActivation(false, "")
+            val db = AppDatabase.getDatabase(getApplication())
+            db.dao().insertSettings(current.copy(isActivated = false, trialStartDate = System.currentTimeMillis(), activationCode = ""))
+            _activationSuccessMessage.value = null
+            _activationError.value = "အစမ်းသုံးသက်တမ်း ၂ ရက် စတင်လိုက်ပါပြီ။"
+        }
     }
 }

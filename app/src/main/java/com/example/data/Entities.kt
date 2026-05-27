@@ -28,5 +28,9 @@ data class SettingsEntity(
     val limitPrice: Int,
     val payoutMultiplier: Int,
     val commissionPercentage: Int,
-    val sessionsCsv: String
+    val sessionsCsv: String,
+    val trialStartDate: Long = 0L,
+    val isActivated: Boolean = false,
+    val activationCode: String = "",
+    val firebaseUrl: String = "https://twodsmartpro-eb96d-default-rtdb.firebaseio.com"
 )

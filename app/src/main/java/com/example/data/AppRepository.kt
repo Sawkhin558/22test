@@ -15,16 +15,32 @@ class AppRepository(private val dao: AppDao) {
                     limitPrice = 200,
                     payoutMultiplier = 80,
                     commissionPercentage = 10,
-                    sessionsCsv = "Morning, Evening"
+                    sessionsCsv = "Morning, Evening",
+                    trialStartDate = System.currentTimeMillis(),
+                    isActivated = false,
+                    activationCode = "",
+                    firebaseUrl = "https://twodsmartpro-eb96d-default-rtdb.firebaseio.com"
                 )
             )
+        } else {
+            val s = dao.getSettings()
+            if (s != null && s.trialStartDate == 0L) {
+                dao.insertSettings(s.copy(trialStartDate = System.currentTimeMillis()))
+            }
         }
     }
 
     suspend fun updateSettings(limit: Int, payout: Int, comm: Int, sessions: String) {
+        val current = dao.getSettings() ?: SettingsEntity(
+            id = 1,
+            limitPrice = limit,
+            payoutMultiplier = payout,
+            commissionPercentage = comm,
+            sessionsCsv = sessions,
+            trialStartDate = System.currentTimeMillis()
+        )
         dao.insertSettings(
-            SettingsEntity(
-                id = 1,
+            current.copy(
                 limitPrice = limit,
                 payoutMultiplier = payout,
                 commissionPercentage = comm,
@@ -33,9 +49,35 @@ class AppRepository(private val dao: AppDao) {
         )
     }
 
+    suspend fun updateActivation(isActivated: Boolean, activationCode: String) {
+        val current = getSettings()
+        dao.insertSettings(
+            current.copy(
+                isActivated = isActivated,
+                activationCode = activationCode
+            )
+        )
+    }
+
+    suspend fun updateFirebaseUrl(url: String) {
+        val current = getSettings()
+        dao.insertSettings(
+            current.copy(
+                firebaseUrl = url
+            )
+        )
+    }
+
     suspend fun getSettings(): SettingsEntity {
         initializeSettingsIfNeeded()
-        return dao.getSettings() ?: SettingsEntity(1, 200, 80, 10, "Morning, Evening")
+        return dao.getSettings() ?: SettingsEntity(
+            id = 1, 
+            limitPrice = 200, 
+            payoutMultiplier = 80, 
+            commissionPercentage = 10, 
+            sessionsCsv = "Morning, Evening", 
+            trialStartDate = System.currentTimeMillis()
+        )
     }
 
     suspend fun insertVoucher(timestamp: Long, timeStr: String, session: String, rawText: String, items: List<VoucherItem>) {
@@ -90,9 +132,16 @@ class AppRepository(private val dao: AppDao) {
     suspend fun clearAllData() {
         dao.deleteAllVouchers()
         dao.deleteAllMasterVouchers()
+        val current = dao.getSettings() ?: SettingsEntity(
+            id = 1,
+            limitPrice = 200,
+            payoutMultiplier = 80,
+            commissionPercentage = 10,
+            sessionsCsv = "Morning, Evening",
+            trialStartDate = System.currentTimeMillis()
+        )
         dao.insertSettings(
-            SettingsEntity(
-                id = 1,
+            current.copy(
                 limitPrice = 200,
                 payoutMultiplier = 80,
                 commissionPercentage = 10,

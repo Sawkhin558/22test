@@ -94,9 +94,7 @@ class AppRepository(private val dao: AppDao) {
     }
 
     suspend fun insertVouchers(vouchers: List<VoucherEntity>) {
-        vouchers.forEach {
-            dao.insertVoucher(it)
-        }
+        dao.insertVouchers(vouchers)
     }
 
     suspend fun updateVoucherEntity(entity: VoucherEntity) {
@@ -105,6 +103,14 @@ class AppRepository(private val dao: AppDao) {
 
     suspend fun deleteVoucherById(id: Long) {
         dao.deleteVoucherById(id)
+    }
+
+    suspend fun sendToMasterTransaction(
+        masterVoucher: MasterVoucherEntity,
+        vouchersToUpdate: List<VoucherEntity>,
+        voucherIdsToDelete: List<Long>
+    ) {
+        dao.sendToMasterTransaction(masterVoucher, vouchersToUpdate, voucherIdsToDelete)
     }
 
     suspend fun insertMasterVoucher(timestamp: Long, timeStr: String, session: String, items: List<VoucherItem>) {

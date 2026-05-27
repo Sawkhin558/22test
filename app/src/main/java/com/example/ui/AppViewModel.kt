@@ -236,15 +236,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val timeStr = SimpleDateFormat("hh:mm:ss a", Locale.getDefault()).format(Date())
-            // Insert Master Voucher
-            repository.insertMasterVoucher(
-                timestamp = System.currentTimeMillis(),
-                timeStr = timeStr,
-                session = session,
-                items = overLimitItems
-            )
 
             // Hold current list of items for each voucher in-memory so updates don't stomp on each other
             val voucherItemsMap = sessionSelfVouchers.associate { v ->
@@ -276,17 +269,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // Write all in-memory changes back to the database
+            val vouchersToUpdate = mutableListOf<VoucherEntity>()
+            val voucherIdsToDelete = mutableListOf<Long>()
+
             sessionSelfVouchers.forEach { v ->
                 val finalItems = voucherItemsMap[v.id] ?: emptyList()
                 if (finalItems.isEmpty()) {
-                    repository.deleteVoucherById(v.id)
+                    voucherIdsToDelete.add(v.id)
                 } else {
                     val updatedJson = CustomJsonHelper.toJson(finalItems)
-                    val updatedEntity = v.copy(itemsJson = updatedJson)
-                    repository.updateVoucherEntity(updatedEntity)
+                    vouchersToUpdate.add(v.copy(itemsJson = updatedJson))
                 }
             }
-            onSuccess()
+
+            try {
+                val masterJson = CustomJsonHelper.toJson(overLimitItems)
+                val masterEntity = MasterVoucherEntity(
+                    timestamp = System.currentTimeMillis(),
+                    timeStr = timeStr,
+                    session = session,
+                    itemsJson = masterJson
+                )
+                repository.sendToMasterTransaction(masterEntity, vouchersToUpdate, voucherIdsToDelete)
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.localizedMessage ?: "အချက်အလက်သိမ်းဆည်းရာတွင် အမှားဖြစ်ပေါ်ခဲ့သည်။")
+                }
+            }
         }
     }
 

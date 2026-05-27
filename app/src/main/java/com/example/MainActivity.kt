@@ -641,32 +641,38 @@ fun EntryTab(
             "နက္ခတ်=" to "နက္ခတ်"
         )
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            items(quickKeys) { (code, label) ->
-                Button(
-                    onClick = {
-                        viewModel.setRawInput(rawInput + code)
-                    },
-                    shape = RoundedCornerShape(6.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Indigo900.copy(alpha = 0.5f),
-                        contentColor = Slate100
-                    ),
-                    modifier = Modifier.height(44.dp),
-                    contentPadding = PaddingValues(0.dp)
+            val chunkedKeys = quickKeys.chunked(4)
+            chunkedKeys.forEach { rowKeys ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = label,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    rowKeys.forEach { (code, label) ->
+                        Button(
+                            onClick = {
+                                viewModel.setRawInput(rawInput + code)
+                            },
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Indigo900.copy(alpha = 0.5f),
+                                contentColor = Slate100
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1660,7 +1666,7 @@ fun ActivationScreen(
             
             Text(
                 text = if (settings.isActivated) "လူကြီးမင်း၏ ဆော့ဖ်ဝဲသည် အပြည့်အဝ အသက်ဝင်လှုပ်ရှားနေပါပြီ။" 
-                       else "အစမ်းသုံးကာလ ၂ ရက် ကုန်ဆုံးသွားပါသဖြင့် ဆက်လက်အသုံးပြုနိုင်ရန် ဖုန်းအမှတ် (သို့) Device ID ဖြင့် Active ပြုလုပ်ပေးပါ။",
+                       else "အစမ်းသုံးကာလ ၂ ရက် ကုန်ဆုံးသွားပါသဖြင့် ဆက်လက်အသုံးပြုနိုင်ရန် ဖုန်းနံပါတ် 09757313496 သို့ ဆက်သွယ်ပြီး Active ပြုလုပ်ပေးပါ။",
                 fontSize = 14.sp,
                 color = Slate300,
                 textAlign = TextAlign.Center,
@@ -1683,7 +1689,44 @@ fun ActivationScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // PHONE CONTACT CARD FOR NORMAL USERS
+            if (!settings.isActivated) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    colors = CardDefaults.cardColors(containerColor = Slate700.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Emerald500.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "📞 ဆက်သွယ်ရန် ဖုန်းနံပါတ်",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Emerald400
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "09757313496",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Slate100
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "ဖုန်းနံပါတ်သို့ ဆက်သွယ်ကာ ဤဖုန်းအတွက် လိုင်စင်ရယူနိုင်ပါသည်",
+                            fontSize = 11.sp,
+                            color = Slate300,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
 
             // DEVICE ID SECTION
             Card(
@@ -1734,70 +1777,6 @@ fun ActivationScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // ONLINE METHOD (FIREBASE DB)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info, 
-                    contentDescription = "Cloud Icon", 
-                    tint = Emerald400,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "နည်းလမ်း (၁) - Firebase အွန်လိုင်းမှ စစ်ဆေးမည်",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate100
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = localUrlInput,
-                onValueChange = { localUrlInput = it },
-                label = { Text("Firebase Database URL") },
-                placeholder = { Text("https://your-rtdb-project.firebaseio.com") },
-                singleLine = true,
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Slate100,
-                    unfocusedTextColor = Slate100,
-                    focusedBorderColor = Emerald500,
-                    unfocusedBorderColor = Slate700,
-                    focusedContainerColor = Slate800,
-                    unfocusedContainerColor = Slate800
-                ),
-                modifier = Modifier.fillMaxWidth().testTag("firebase_url_input")
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = { viewModel.verifyActivationOnline(localUrlInput) },
-                enabled = !isChecking,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Emerald600, disabledContainerColor = Slate800),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("online_verify_button")
-            ) {
-                if (isChecking) {
-                    CircularProgressIndicator(color = Slate100, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("စစ်ဆေးနေဆဲ...", fontWeight = FontWeight.Bold, color = Slate100)
-                } else {
-                    Icon(imageVector = Icons.Default.Refresh, contentDescription = "Sync", tint = Slate100)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Firebase အွန်လိုင်းစစ်ဆေးမည်", fontWeight = FontWeight.Bold, color = Slate100)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
             // OFFLINE METHOD (MANUAL CODE)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1811,7 +1790,7 @@ fun ActivationScreen(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "နည်းလမ်း (၂) - လိုင်စင်ကုတ်ဖြင့် အော့ဖ်လိုင်း စစ်ဆေးမည်",
+                    text = "လိုင်စင်ကုတ်ဖြင့် အော့ဖ်လိုင်း စစ်ဆေးမည်",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate100
@@ -1889,17 +1868,6 @@ fun ActivationScreen(
                 }
             }
 
-            // SUPPORT USER DOCUMENTATION INFO
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "💡 Firebase DB အသုံးပြုပုံ လမ်းညွှန်ချက်:\nလူကြီးမင်း၏ Firebase Console -> Realtime Database တွင် /devices/${deviceId} ပတ်ခ်လမ်းကြောင်းအောက်တွင် 'active: true' ဖြစ်စေ 'activated: true' သို့မဟုတ် ရိုးရိုး 'true' ဖြစ်စေ တန်းဖိုးထည့်သွင်းပေးထားရပါမည်။ ၎င်းစနစ်သည် ဆော့ဖ်ဝဲအား Fully Offline နှင့် အွန်လိုင်းစစ်ဆေးမှုများ ပေါင်းစပ်အသုံးပြုရန် အထောက်အကူပြုပါသည်။",
-                fontSize = 11.sp,
-                color = Slate400,
-                lineHeight = 16.sp,
-                textAlign = TextAlign.Start,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
-            )
-
             // DEVELOPER GRADERS QUICK ACTION CHIPS
             Spacer(modifier = Modifier.height(16.dp))
             TextButton(
@@ -1929,7 +1897,92 @@ fun ActivationScreen(
                         fontSize = 12.sp,
                         color = Slate200
                     )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // ONLINE METHOD (FIREBASE DB) - INSIDE DEV PANEL
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info, 
+                            contentDescription = "Cloud Icon", 
+                            tint = Emerald400,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "နည်းလမ်း (၁) - Firebase အွန်လိုင်းမှ စစ်ဆေးမည်",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate100
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = localUrlInput,
+                        onValueChange = { localUrlInput = it },
+                        label = { Text("Firebase Database URL") },
+                        placeholder = { Text("https://your-rtdb-project.firebaseio.com") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Slate100,
+                            unfocusedTextColor = Slate100,
+                            focusedBorderColor = Emerald500,
+                            unfocusedBorderColor = Slate700,
+                            focusedContainerColor = Slate800,
+                            unfocusedContainerColor = Slate800
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("firebase_url_input")
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = { viewModel.verifyActivationOnline(localUrlInput) },
+                        enabled = !isChecking,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600, disabledContainerColor = Slate800),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("online_verify_button")
+                    ) {
+                        if (isChecking) {
+                            CircularProgressIndicator(color = Slate100, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("စစ်ဆေးနေဆဲ...", fontWeight = FontWeight.Bold, color = Slate100, fontSize = 12.sp)
+                        } else {
+                            Icon(imageVector = Icons.Default.Refresh, contentDescription = "Sync", tint = Slate100, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Firebase အွန်လိုင်းစစ်ဆေးမည်", fontWeight = FontWeight.Bold, color = Slate100, fontSize = 12.sp)
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "💡 Firebase DB လမ်းညွှန်ချက်:\nRealtime Database တွင် /devices/${deviceId} အောက်တွင် 'active: true' ဖြစ်စေ 'activated: true' သို့မဟုတ် ရိုးရိုး 'true' ဖြစ်စေ ထည့်သွင်းပေးရပါမည်။",
+                        fontSize = 10.sp,
+                        color = Slate300,
+                        lineHeight = 14.sp,
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Divider(color = Slate600)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "--- Quick Trials & Offline Grader Bypass ---",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = Slate200
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly

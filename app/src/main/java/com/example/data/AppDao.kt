@@ -11,11 +11,17 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVoucher(voucher: VoucherEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVouchers(vouchers: List<VoucherEntity>)
+
     @Delete
     suspend fun deleteVoucher(voucher: VoucherEntity)
 
     @Query("DELETE FROM vouchers WHERE id = :id")
     suspend fun deleteVoucherById(id: Long)
+
+    @Query("DELETE FROM vouchers WHERE id IN (:ids)")
+    suspend fun deleteVouchersByIds(ids: List<Long>)
 
     @Query("DELETE FROM vouchers")
     suspend fun deleteAllVouchers()
@@ -48,4 +54,19 @@ interface AppDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSettings(settings: SettingsEntity)
+
+    @Transaction
+    suspend fun sendToMasterTransaction(
+        masterVoucher: MasterVoucherEntity,
+        vouchersToUpdate: List<VoucherEntity>,
+        voucherIdsToDelete: List<Long>
+    ) {
+        insertMasterVoucher(masterVoucher)
+        if (vouchersToUpdate.isNotEmpty()) {
+            insertVouchers(vouchersToUpdate)
+        }
+        if (voucherIdsToDelete.isNotEmpty()) {
+            deleteVouchersByIds(voucherIdsToDelete)
+        }
+    }
 }

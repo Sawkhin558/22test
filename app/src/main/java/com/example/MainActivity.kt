@@ -463,12 +463,7 @@ fun MainScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                     pat19 = pat19,
                     rawInput = rawInput,
                     errorText = errorText,
-                    settings = settings,
-                    onFocusChanged = { isFocused ->
-                        if (isFocused) {
-                            isSummaryExpanded = false
-                        }
-                    }
+                    settings = settings
                 )
                 "vouchers" -> VouchersTab(viewModel = viewModel, currentSession = currentSession, vouchers = vouchers)
                 "master" -> MasterTab(viewModel = viewModel, currentSession = currentSession, masterVouchers = masterVouchers)
@@ -568,8 +563,7 @@ fun EntryTab(
     pat19: Boolean,
     rawInput: String,
     errorText: String?,
-    settings: SettingsEntity,
-    onFocusChanged: (Boolean) -> Unit
+    settings: SettingsEntity
 ) {
     val sessionList = remember(settings.sessionsCsv) {
         settings.sessionsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -647,9 +641,6 @@ fun EntryTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(160.dp)
-                .onFocusChanged { focusState ->
-                    onFocusChanged(focusState.isFocused)
-                }
                 .testTag("raw_formula_input"),
             shape = RoundedCornerShape(8.dp),
             colors = OutlinedTextFieldDefaults.colors(

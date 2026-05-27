@@ -246,12 +246,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 items = overLimitItems
             )
 
-            // Subtract from original vouchers (walk backward, newest first)
+            // Hold current list of items for each voucher in-memory so updates don't stomp on each other
+            val voucherItemsMap = sessionSelfVouchers.associate { v ->
+                v.id to CustomJsonHelper.fromJson(v.itemsJson).toMutableList()
+            }.toMutableMap()
+
+            // To prioritize subtracting from newest vouchers first, sort descending by ID
+            val sortedVouchers = sessionSelfVouchers.sortedByDescending { it.id }
+
+            // Subtract from original vouchers
             overLimitItems.forEach { mItem ->
                 var leftBytes = mItem.amt
-                for (v in sessionSelfVouchers) {
+                for (v in sortedVouchers) {
                     if (leftBytes <= 0) break
-                    val items = CustomJsonHelper.fromJson(v.itemsJson).toMutableList()
+                    val items = voucherItemsMap[v.id] ?: continue
                     val matchIndex = items.indexOfFirst { it.num == mItem.num }
                     if (matchIndex != -1) {
                         val originalItem = items[matchIndex]
@@ -263,17 +271,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             items.removeAt(matchIndex)
                         }
                         leftBytes -= sub
-
-                        // Update or delete
-                        if (items.isEmpty()) {
-                            repository.deleteVoucherById(v.id)
-                        } else {
-                            // Update voucher entity items
-                            val updatedJson = CustomJsonHelper.toJson(items)
-                            val updatedEntity = v.copy(itemsJson = updatedJson)
-                            repository.updateVoucherEntity(updatedEntity)
-                        }
                     }
+                }
+            }
+
+            // Write all in-memory changes back to the database
+            sessionSelfVouchers.forEach { v ->
+                val finalItems = voucherItemsMap[v.id] ?: emptyList()
+                if (finalItems.isEmpty()) {
+                    repository.deleteVoucherById(v.id)
+                } else {
+                    val updatedJson = CustomJsonHelper.toJson(finalItems)
+                    val updatedEntity = v.copy(itemsJson = updatedJson)
+                    repository.updateVoucherEntity(updatedEntity)
                 }
             }
             onSuccess()

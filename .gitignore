@@ -1,4 +1,5 @@
 *.iml
+# Keep these - they are tracked files
 .gradle
 .kotlin
 /local.properties

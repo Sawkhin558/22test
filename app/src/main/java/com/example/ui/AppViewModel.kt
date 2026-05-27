@@ -53,20 +53,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _activationSuccessMessage = MutableStateFlow<String?>(null)
     val activationSuccessMessage: StateFlow<String?> = _activationSuccessMessage.asStateFlow()
 
-    val trialDaysRemaining = settingsFlow.map { s ->
-        if (s.isActivated) {
-            999
-        } else {
-            val elapsedMs = System.currentTimeMillis() - s.trialStartDate
-            val dayInMs = 24 * 60 * 60 * 1000L
-            val daysElapsed = elapsedMs.toDouble() / dayInMs
-            val remaining = 2 - daysElapsed.toInt()
-            if (remaining < 0) 0 else remaining
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2)
+    val trialDaysRemaining = flow {
+        emit(999)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 999)
 
-    val isAppLocked = settingsFlow.combine(trialDaysRemaining) { s, remaining ->
-        !s.isActivated && remaining <= 0
+    val isAppLocked = flow {
+        emit(false)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _rawInput = MutableStateFlow("")

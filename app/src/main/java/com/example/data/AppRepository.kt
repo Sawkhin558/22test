@@ -17,7 +17,7 @@ class AppRepository(private val dao: AppDao) {
                     commissionPercentage = 10,
                     sessionsCsv = "Morning, Evening",
                     trialStartDate = System.currentTimeMillis(),
-                    isActivated = false,
+                    isActivated = true,
                     activationCode = "",
                     firebaseUrl = "https://twodsmartpro-eb96d-default-rtdb.firebaseio.com"
                 )

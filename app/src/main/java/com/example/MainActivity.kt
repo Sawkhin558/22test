@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -94,6 +95,7 @@ fun MainScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
 
     var activeTab by remember { mutableStateOf("entry") }
     var showActivationDialog by remember { mutableStateOf(false) }
+    var isSummaryExpanded by remember { mutableStateOf(true) }
 
     // Aggregate Current Session Live Balances for top card
     val activeVouchers = vouchers.filter { it.session == currentSession }
@@ -216,132 +218,188 @@ fun MainScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // Notice Board Summary Board Card
+        // Notice Board Summary Board Card - Collapsible to optimize keyboard entry space
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .clickable { isSummaryExpanded = !isSummaryExpanded },
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Slate800),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
             border = BorderStroke(1.dp, Slate700)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
+            if (isSummaryExpanded) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Session Info Icon",
+                                tint = Amber500,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "🕒 Active Session: ",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Slate300
+                            )
+                            Text(
+                                text = currentSession,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Amber500
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Collapse Dashboard",
+                            tint = Slate300,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Divider(color = Slate700, thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "မိမိကိုင်ထားငွေ (Self)",
+                                fontSize = 12.sp,
+                                color = Slate300
+                            )
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "${String.format("%,d", selfTotal)} Ks",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Emerald500
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Master ပို့ရန် (Over)",
+                                fontSize = 12.sp,
+                                color = Slate300
+                            )
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "${String.format("%,d", masterTotal)} Ks",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (masterTotal > 0) Crimson500 else Slate300
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Slate900.copy(alpha = 0.3f))
+                            .padding(10.dp)
+                    ) {
+                        if (selfTotal > 0) {
+                            Column {
+                                Row {
+                                    Text(
+                                        text = "အသားတင်: ",
+                                        fontSize = 13.sp,
+                                        color = Slate300
+                                    )
+                                    Text(
+                                        text = "${String.format("%,.0f", netIncome)} Ks",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Slate100
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "ပေါက်ခဲ့လျှင်: ",
+                                        fontSize = 13.sp,
+                                        color = Slate300
+                                    )
+                                    val color = if (risk >= 0) Emerald500 else Crimson500
+                                    val outcomeText = if (risk >= 0) "မြတ်" else "ရှုံး"
+                                    Text(
+                                        text = "${String.format("%,.0f", risk.absoluteValue)} $outcomeText",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = color
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "📢 စောင့်ဆိုင်းနေသည် (စာရင်းသွင်းပါ)...",
+                                fontSize = 13.sp,
+                                color = Slate300,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Collapsed Compact Layout (Ideal for input view)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = "Session Info Icon",
                             tint = Amber500,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "🕒 Active Session: ",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Slate300
-                        )
-                        Text(
-                            text = currentSession,
-                            fontSize = 14.sp,
+                            text = "$currentSession: ",
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Amber500
                         )
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                Divider(color = Slate700, thickness = 1.dp)
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "မိမိကိုင်ထားငွေ (Self)",
+                            text = "Self: ${String.format("%,d", selfTotal)} Ks",
                             fontSize = 12.sp,
-                            color = Slate300
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "${String.format("%,d", selfTotal)} Ks",
-                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Emerald500
                         )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Master ပို့ရန် (Over)",
+                            text = "| Over: ${String.format("%,d", masterTotal)} Ks",
                             fontSize = 12.sp,
-                            color = Slate300
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "${String.format("%,d", masterTotal)} Ks",
-                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (masterTotal > 0) Crimson500 else Slate300
+                            color = if (masterTotal > 0) Crimson500 else Slate400
                         )
                     }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Slate900.copy(alpha = 0.3f))
-                        .padding(10.dp)
-                ) {
-                    if (selfTotal > 0) {
-                        Column {
-                            Row {
-                                Text(
-                                    text = "အသားတင်: ",
-                                    fontSize = 13.sp,
-                                    color = Slate300
-                                )
-                                Text(
-                                    text = "${String.format("%,.0f", netIncome)} Ks",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Slate100
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "ပေါက်ခဲ့လျှင်: ",
-                                    fontSize = 13.sp,
-                                    color = Slate300
-                                )
-                                val color = if (risk >= 0) Emerald500 else Crimson500
-                                val outcomeText = if (risk >= 0) "မြတ်" else "ရှုံး"
-                                Text(
-                                    text = "${String.format("%,.0f", risk.absoluteValue)} $outcomeText",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = color
-                                )
-                            }
-                        }
-                    } else {
-                        Text(
-                            text = "📢 စောင့်ဆိုင်းနေသည် (စာရင်းသွင်းပါ)...",
-                            fontSize = 13.sp,
-                            color = Slate300,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Expand Dashboard",
+                        tint = Slate300,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
@@ -399,7 +457,19 @@ fun MainScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                 .padding(horizontal = 16.dp)
         ) {
             when (activeTab) {
-                "entry" -> EntryTab(viewModel = viewModel, currentSession = currentSession, pat19 = pat19, rawInput = rawInput, errorText = errorText, settings = settings)
+                "entry" -> EntryTab(
+                    viewModel = viewModel,
+                    currentSession = currentSession,
+                    pat19 = pat19,
+                    rawInput = rawInput,
+                    errorText = errorText,
+                    settings = settings,
+                    onFocusChanged = { isFocused ->
+                        if (isFocused) {
+                            isSummaryExpanded = false
+                        }
+                    }
+                )
                 "vouchers" -> VouchersTab(viewModel = viewModel, currentSession = currentSession, vouchers = vouchers)
                 "master" -> MasterTab(viewModel = viewModel, currentSession = currentSession, masterVouchers = masterVouchers)
                 "report" -> ReportTab(viewModel = viewModel, currentSession = currentSession, limit = limit, totalsMap = totalsMap)
@@ -498,7 +568,8 @@ fun EntryTab(
     pat19: Boolean,
     rawInput: String,
     errorText: String?,
-    settings: SettingsEntity
+    settings: SettingsEntity,
+    onFocusChanged: (Boolean) -> Unit
 ) {
     val sessionList = remember(settings.sessionsCsv) {
         settings.sessionsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -576,6 +647,9 @@ fun EntryTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(160.dp)
+                .onFocusChanged { focusState ->
+                    onFocusChanged(focusState.isFocused)
+                }
                 .testTag("raw_formula_input"),
             shape = RoundedCornerShape(8.dp),
             colors = OutlinedTextFieldDefaults.colors(

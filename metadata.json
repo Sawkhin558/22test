@@ -1,0 +1,6 @@
+{
+  "name": "2D Smart Pro",
+  "description": "Smart over-limit calculating ledger and settlement bookkeeping tool for Myanmar 2D",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
